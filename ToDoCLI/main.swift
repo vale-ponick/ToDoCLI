@@ -24,3 +24,53 @@ func addTask() -> String? { // Одна функция —> одна ответ�
         return input
     }
 }
+
+// MARK: - Main loop
+while true {
+    print("\n 📝 ToDoCLI: ➕ add | 📋 list | ✖️ delete | 🏁 exit")
+    print("> ", terminator: "")
+    
+    let command = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) // преобразуем ввод юзера
+    
+    switch command {
+    case "add", "1":
+        if let newTask = addTask() {
+            tasks.append(newTask)
+            print("✅ Added: \(newTask)")
+        }
+    case "list", "2":
+        if tasks.isEmpty {
+            print("No task")
+        } else {
+            for (index, task) in tasks.enumerated() { // ?
+                print("\(index + 1). \(task)")
+            }
+        }
+    case "delete", "3":
+        if tasks.isEmpty {
+            print("No task")
+            continue
+        }
+        print("Delete number of task: ", terminator: "")
+        let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard let input = input, let number = Int(input)  else {
+            print("Emter a valid number: ")
+            continue
+        }
+        let index = number - 1
+        guard index >= 0 && index < tasks.count else {
+            print("Task number \(number) does not exist")
+            continue
+        }
+            let removed = tasks.remove(at: index)
+            print("Deleted: \(removed)")
+        
+    case "exit", "quit", "4":
+        print("By, vale.ponick!")
+        break
+        
+    default:
+        print("Unknown command. Use: add, list, delete, exit")
+    }
+}
