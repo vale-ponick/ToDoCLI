@@ -67,8 +67,14 @@ while true {
             print("Deleted: \(removed)")
         
     case "clear", "5":
-        tasks.removeAll()
-        print("All tasks deleted")
+        print("⚠️ Dwleteall tasks? (y/n): ", terminator: "")
+        let confirm = readLine()?.lowercased()
+        if confirm == "y" || confirm == "yes" {
+            tasks.removeAll()
+            print("All tasks deleted")
+        } else {
+            print("Cancelled")
+        }
         
     case "exit", "quit", "4":
         print("By, vale.ponick!")
