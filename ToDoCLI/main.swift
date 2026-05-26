@@ -9,78 +9,213 @@ import Foundation
 
 print("ToDoCLI")
 
-// MARK: - данные
-var tasks: [String] = [] // массив здля хранения адач
+// MARK: - Command Enum
 
-func addTask() -> String? { // Одна функция —> одна ответственность
-    while true {
-        print("Add task: ", terminator: "") // подсказка юзеру
-        
+enum Command: String {
+    case add
+    case list
+    case delete
+    case clear
+    case save
+    case exit
+    
+    static let aliases: [String: Command] = [
+        "1": .add,
+        "2": .list,
+        "3": .delete,
+        "4": .clear,
+        "5": .save,
+        "6": .exit,
+        "quit": .exit,
+        "q": .exit
+    ]
+    
+    init?(from input: String) {
+        let cleaned = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let command = Command(rawValue: cleaned) {
+            self = command
+        } else if let aliased = Command.aliases[cleaned] {
+            self = aliased
+        } else {
+            return nil
+        }
+    }
+}
+
+// MARK: - Task Structure
+
+struct Task: Codable {
+    let id: Int
+    var text: String
+    var category: String
+    var isCompleted: Bool = false
+    
+    var description: String {
+        let status = isCompleted ? "✅" : "⏳"
+        return "[\(category)] \(text)"
+    }
+}
+
+// MARK: - ToDoList Structure
+
+struct ToDoList {
+    private var tasks: [Task] = []
+    private var nextID: Int = 1
+    private let filename: String = "tasks.json"
+    
+    // MARK: - Private Helpers
+    
+    private func getValidatedInput(prompt: String, allowEmpty: Bool = false) -> String? {
+        print(prompt, terminator: "")
         let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if allowEmpty {
+            return input
+        }
+        
         guard let input = input, !input.isEmpty else {
-            print("❌ Please enter a non-empty task")
-            continue
+            print("❌ Input cannot be empty")
+            return nil
         }
         return input
     }
-}
-
-// MARK: - Main loop
-while true {
-    print("\n 📝 ToDoCLI: ➕ add | 📋 list | ✖️ delete | 🏁 exit | 🧹 clear")
-    print("> ", terminator: "")
     
-    let command = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) // преобразуем ввод юзера
-    
-    switch command {
-    case "add", "1":
-        if let newTask = addTask() {
-            tasks.append(newTask)
-            print("✅ Added: \(newTask)")
+    private func getTaskNumber() -> Int? {
+        guard let input = getValidatedInput(prompt: "Delete number of task: "),
+              let number = Int(input) else {
+            print("❌ Enter a valid number")
+            return nil
         }
-    case "list", "2":
-        if tasks.isEmpty {
-            print("No task")
-        } else {
-            for (index, task) in tasks.enumerated() { // ?
-                print("\(index + 1). \(task)")
-            }
-        }
-    case "delete", "3":
-        if tasks.isEmpty {
-            print("No task")
-            continue
-        }
-        print("Delete number of task: ", terminator: "")
-        let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        guard let input = input, let number = Int(input)  else {
-            print("Emter a valid number: ")
-            continue
-        }
         let index = number - 1
         guard index >= 0 && index < tasks.count else {
-            print("Task number \(number) does not exist")
-            continue
+            print("❌ Task number \(number) does not exist")
+            return nil
         }
-            let removed = tasks.remove(at: index)
-            print("Deleted: \(removed)")
+        return index
+    }
+    
+    private mutating func loadTasks() {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: filename)),
+              let decoded = try? JSONDecoder().decode([Task].self, from: data) else {
+            print("📭 No saved tasks found")
+            return
+        }
+        tasks = decoded
+        if let maxID = tasks.map({ $0.id }).max() {
+            nextID = maxID + 1
+        }
+        print("✅ Loaded \(tasks.count) task(s) from file")
+    }
+    
+    private func saveTasks() {
+        do {
+            let encoded = try JSONEncoder().encode(tasks)
+            try encoded.write(to: URL(fileURLWithPath: filename))
+            print("✅ Saved \(tasks.count) task(s) to \(filename)")
+        } catch {
+            print("❌ Error saving: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Commands
+    
+    mutating func add() {
+        guard let text = getValidatedInput(prompt: "Add task: ") else { return }
         
-    case "clear", "5":
-        print("⚠️ Dwleteall tasks? (y/n): ", terminator: "")
-        let confirm = readLine()?.lowercased()
-        if confirm == "y" || confirm == "yes" {
-            tasks.removeAll()
-            print("All tasks deleted")
+        let category = getValidatedInput(prompt: "Category (work/personal/other): ", allowEmpty: true) ?? "other"
+        
+        let task = Task(id: nextID, text: text, category: category)
+        tasks.append(task)
+        nextID += 1
+        print("✅ Added: \(task.description)")
+    }
+    
+    func list() {
+        if tasks.isEmpty {
+            print("📭 No tasks")
         } else {
-            print("Cancelled")
+            let grouped = Dictionary(grouping: tasks, by: { $0.category })
+            
+            for (category, catTasks) in grouped.sorted(by: { $0.key < $1.key }) {
+                print("\n📁 \(category.uppercased()) (\(catTasks.count)):")
+                for task in catTasks {
+                    print("  [\(task.isCompleted ? "✅" : "⏳")] \(task.text)")
+                }
+            }
+            
+            print("\n📊 Total: \(tasks.count) task\(tasks.count == 1 ? "" : "s")")
+        }
+    }
+    
+    mutating func delete() {
+        guard !tasks.isEmpty else {
+            print("📭 No tasks to delete")
+            return
         }
         
-    case "exit", "quit", "4":
-        print("By, vale.ponick!")
-        break
+        guard let index = getTaskNumber() else { return }
+        let removed = tasks.remove(at: index)
+        print("🗑️ Deleted: \(removed.description)")
+    }
+    
+    mutating func clear() {
+        guard !tasks.isEmpty else {
+            print("📭 No tasks to clear")
+            return
+        }
         
-    default:
-        print("Unknown command. Use: add, list, delete, exit")
+        print("⚠️ Delete all tasks? (y/n): ", terminator: "")
+        guard let confirm = readLine()?.lowercased(),
+              confirm == "y" || confirm == "yes" else {
+            print("❌ Cancelled")
+            return
+        }
+        
+        tasks.removeAll()
+        print("🗑️ All tasks deleted")
+    }
+    
+    mutating func save() {
+        saveTasks()
+    }
+    
+    func exit() {
+        print("💾 Auto-saving before exit...")
+        saveTasks()
+        print("👋 By, vale.ponick!")
+    }
+    
+    // MARK: - Main Loop
+    
+    mutating func run() {
+        loadTasks()
+        
+        while true {
+            print("\n📝 ToDoCLI: ➕ add | 📋 list | ✖️ delete | 🧹 clear | 💾 save | 🏁 exit")
+            print("> ", terminator: "")
+            
+            guard let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let command = Command(from: input) else {
+                print("❌ Unknown command. Use: add, list, delete, clear, save, exit")
+                continue
+            }
+            
+            switch command {
+            case .add: add()
+            case .list: list()
+            case .delete: delete()
+            case .clear: clear()
+            case .save: save()
+            case .exit:
+                exit()
+                return
+            }
+        }
     }
 }
+
+// MARK: - Program Entry Point
+
+var todo = ToDoList()
+todo.run()
