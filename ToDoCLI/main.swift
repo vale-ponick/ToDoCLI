@@ -27,7 +27,7 @@ func addTask() -> String? { // Одна функция —> одна ответ�
 
 // MARK: - Main loop
 while true {
-    print("\n 📝 ToDoCLI: ➕ add | 📋 list | ✖️ delete | 🏁 exit")
+    print("\n 📝 ToDoCLI: ➕ add | 📋 list | ✖️ delete | 🏁 exit | 🧹 clear")
     print("> ", terminator: "")
     
     let command = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) // преобразуем ввод юзера
@@ -65,6 +65,10 @@ while true {
         }
             let removed = tasks.remove(at: index)
             print("Deleted: \(removed)")
+        
+    case "clear", "5":
+        tasks.removeAll()
+        print("All tasks deleted")
         
     case "exit", "quit", "4":
         print("By, vale.ponick!")
